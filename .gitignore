@@ -1,0 +1,5 @@
+# Ignore the entire given bit
+Final/**
+
+# Also venv
+.venv/**
