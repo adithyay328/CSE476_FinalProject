@@ -132,15 +132,24 @@ class IngestAgent(Agent):
     You are not allowed to respond before that
     """
 
+  def answer_question(self, question: str) -> str:
+    """
+    A helper function that ingests
+    a question and returns the answer
+    directly.
+    """
+    state = IngestAgentState(
+      question=question
+    )
+
+    nextState = self.evolve(state)
+
+    return nextState.answer
+
 if __name__ == "__main__":
-  # Simple test
-  state = IngestAgentState(
-    question="What is the capital of France?"
-  )
-
-  # Get the next state
-  agent = state.get_agent()
-  nextState = agent._evolve(state)
-
-  # Print the answer
-  print(nextState.answer)
+  print("Testing ingest agent...")
+  agent = IngestAgent()
+  question = "What is 2+2?"
+  answer = agent.answer_question( question )
+  print  ("Question:", question)
+  print  ("Answer:", answer)

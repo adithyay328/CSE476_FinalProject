@@ -69,6 +69,8 @@ class Agent(ABC):
     if nextState.is_done:
       raise ValueError("Evolved state cannot be marked as done, this prevents the agent from continuing")
 
+    return nextState
+
   @abstractmethod
   def get_tools(self):
     # Return a list of all tool
