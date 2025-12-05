@@ -27,14 +27,6 @@ def rawCall(agentState : AgentState, temperature: float = 0.0, timeout: int = 60
       "max_tokens": 128,
   }
 
-  # Also get all tool definitions
-  tool_definitions = []
-  agent = agentState.get_agent()
-  for tool in agent.get_tools():
-    tool_definitions.append(tool.tool_definition.model_dump())
-
-  payload["tools"] = tool_definitions
-
   resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
   return resp
 

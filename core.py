@@ -209,7 +209,7 @@ def make_tool(f: Callable[[AgentState, T], Tuple[AgentState, str]], jsonSchema :
 class TalkToUserArgs(BaseModel):
   message : str
 
-def _talk_to_user_tool(state: AgentState, args: TalkToUserArgs) -> Tuple[AgentState, str]:
+def talk_to_user_tool(state: AgentState, args: TalkToUserArgs) -> Tuple[AgentState, str]:
   # Since the outer wrapper
   # already handles addingg us
   # to the messages, we just
@@ -218,4 +218,4 @@ def _talk_to_user_tool(state: AgentState, args: TalkToUserArgs) -> Tuple[AgentSt
   print(f"AI: {args.message}")
   return state, "Message sent to user"
 
-talk_to_user_tool = make_tool(_talk_to_user_tool, TalkToUserArgs)
+talk_to_user_tool = make_tool(talk_to_user_tool, TalkToUserArgs)
