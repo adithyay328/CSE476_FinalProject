@@ -20,31 +20,15 @@ def rawCall(agentState : AgentState, temperature: float = 0.0, timeout: int = 60
   messages = [
     msg.model_dump() for msg in agentState.messages
   ]
+
+  if len(messages) > 2:
+    print(messages[1:])
+
   payload = {
       "model": MODEL,
       "messages": messages,
       "temperature": temperature,
-      "max_tokens": 128,
+      "max_tokens": 5000,
   }
-
   resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
   return resp
-
-# Try out a raw call
-if __name__ == "__main__":
-  from ingest import IngestAgentState
-  from core import ConvoMessage
-
-  state = IngestAgentState()
-
-  # Add a system message
-  state.messages.append(
-    ConvoMessage(
-      role="system",
-      content="You are a helpful assistant."
-    )
-  )
-
-  response = rawCall(state)
-  print("Response status:", response.status_code)
-  print("Response body:", response.text)

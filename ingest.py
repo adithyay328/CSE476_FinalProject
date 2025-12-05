@@ -4,8 +4,11 @@
 # and then returning the final answer.
 from typing import List, Tuple
 import copy
+import subprocess as sp
 
 from pydantic import BaseModel
+from RestrictedPython import compile_restricted, safe_builtins, utility_builtins, limited_builtins
+from RestrictedPython.PrintCollector import PrintCollector
 
 from core import Agent, AgentState, ConvoMessage, make_tool, ToolCallRequest
 from loop import loop
@@ -29,8 +32,79 @@ def answer_tool( state : "IngestAgentState", args: AnswerToolArgs) -> Tuple["Ing
 
 answer_tool = make_tool( answer_tool, AnswerToolArgs )
 
+class EmtpyArgs(BaseModel):
+  placeholder : str = ""
+
+def read_code_tool( state : "IngestAgentState", args: EmtpyArgs) -> Tuple["IngestAgentState", str]:
+  """
+  This tool reads the source code
+  you have written so far and
+  returns it to you
+  """
+  return state, state.source_code
+
+read_code_tool = make_tool( read_code_tool, EmtpyArgs )
+
+class WriteCodeArgs(BaseModel):
+  code : str
+
+def write_code_tool( state : "IngestAgentState", args: WriteCodeArgs) -> Tuple["IngestAgentState", str]:
+  """
+  This tool over-writes all the code
+  in the environment
+  """
+  state.source_code = args.code
+  return state, "Code written."
+
+write_code_tool = make_tool( write_code_tool, WriteCodeArgs )
+
+def execute_code_tool( state : "IngestAgentState", args: EmtpyArgs) -> Tuple["IngestAgentState", str]:
+  """
+  This tool executes the current
+  source code in the environment,
+  returning any output or errors.
+
+  The result of the execution
+  must be stored in a variable
+  called 'result' in the code,
+  as this is what we will extract
+  """
+  if state.source_code.strip() == "":
+    return state, "Refusing to execute, code is empty. Please write code first."
+
+  try:
+    # Prepare the restricted environment
+    restricted_globals = {
+      '__builtins__': safe_builtins,
+    }
+    restricted_globals['__builtins__'].update(utility_builtins)
+    restricted_globals['__builtins__'].update(limited_builtins)
+
+    # Compile the code
+    byte_code = compile_restricted(state.source_code, filename='<inline code>', mode='exec')
+
+    # Prepare local dictionary to capture output
+    restricted_locals = {}
+
+    # Execute the code
+    exec(byte_code, restricted_globals, restricted_locals)
+
+    if 'result' not in restricted_locals:
+      raise ValueError("The executed code did not define a 'result' variable Re-write the code.")
+
+    result = restricted_locals.get('result', "No result variable defined.")
+
+    return state, f"Code executed successfully. Result: {result}"
+  except Exception as e:
+    return state, f"Error during code execution: {str(e)}"
+
+execute_code_tool = make_tool( execute_code_tool, EmtpyArgs )
+
 _ingestTools = [
-  answer_tool
+  answer_tool,
+  read_code_tool,
+  write_code_tool,
+  execute_code_tool
 ]
 
 class IngestAgentState(AgentState):
@@ -45,6 +119,10 @@ class IngestAgentState(AgentState):
 
   # The answer is stored here
   answer : str = ""
+
+  # Python source code
+  # is in here
+  source_code : str = ""
 
   def get_agent(self):
     return IngestAgent()
@@ -83,7 +161,8 @@ class IngestAgent(Agent):
       systemPrompt = ConvoMessage(
         role="system",
         content=f"""
-        You are a helpful agent that ingests a question and provides the final answer.
+        You are a helpful agent that ingests a question and provides the final answer,
+        thinking about it step by step if needed.
 
         You only respond with tool calls. The formal schema for a tool call is:
         {
@@ -94,7 +173,14 @@ class IngestAgent(Agent):
         {
           [ m.tool_definition.model_dump_json() for m in _ingestTools ]
         }
-      
+
+        You use the coding feature extensively for any non-trivial math, to avoid
+        simple errors and to take advantage of Python's determinism,
+        with a safe subset of the language being imported automatically.
+        You do not write any imports of your own as that will cause
+        a failure. You assume that the math, random and other safe
+        subsets of the standard library are available automatically,
+        with no external dependencies.
         """
       )
 
@@ -149,7 +235,7 @@ class IngestAgent(Agent):
 if __name__ == "__main__":
   print("Testing ingest agent...")
   agent = IngestAgent()
-  question = "What is 2+2?"
+  question = input("Enter a question to ingest: ")
   answer = agent.answer_question( question )
   print  ("Question:", question)
   print  ("Answer:", answer)

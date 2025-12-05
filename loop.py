@@ -16,18 +16,39 @@ def loop( initial_state : AgentState ) -> AgentState:
     agent = state.get_agent()
 
     # Get the next response from the API
-    modelResp = rawCall( state )
+    try:
+      modelResp = rawCall( state )
+    except Exception as e:
+      raise ValueError("Error calling model: " + str(e))
 
-    # If tool calls is an empty
-    # list, add to the messages
-    text = modelResp.json()["choices"][0]["message"]["content"]
-
+    try:
+      # If tool calls is an empty
+      # list, add to the messages
+      text = modelResp.json()["choices"][0]["message"]["content"]
+      # print("Model response:", text)
+    except Exception as e:
+      print("Failed to parse model response as JSON:", str(e))
+      # Failed to parse as JSON,
+      # add that to the messages
+      state.messages.append(
+        ConvoMessage(
+          role="assistant",
+            content=f"Error calling model: {str(e)}. Be careful and ensure all responses are valid tool call JSONs."
+        )
+      )
+      # PROBLEM; our end is causing the prompt
+      # to eventually not be valid. We are dumping
+      # in junk somewhere
+      # print("Model response:", modelResp.text)
+      continue
+    
     # As per our new rule,
     # all responses must be tool calls
     try:
       toolCall = ToolCallRequest.model_validate_json( text )
       # Call the tool
       toolName = toolCall.function.name
+      print("Calling tool:", toolName)
       toolFunc = [ t for t in agent.get_tools() if t.__name__ == toolName ]
       if len(toolFunc) == 0:
         raise ValueError("No tool found with name: " + toolName)
