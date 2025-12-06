@@ -86,7 +86,7 @@ def search_tool( parameter : str ) -> str:
   results = client.search( parameter )
   return f"Search results for query: {results}"
 
-def solve( question : str ):
+def _solve( question : str ):
   """
   A much simpler agent that just loops
   and solves the question
@@ -212,7 +212,58 @@ def solve( question : str ):
 
   return finalAnswer
 
+def solve( question : str, n_paths : int = 1 ) -> str:
+  """
+  Solve the question using self-consistency
+  by sampling n_paths different solution paths,
+  then using another model to pick the best final answer.
+  """
+  if n_paths == 1:
+    return _solve( question )
+
+  # Otherwise, we need to sample multiple paths,
+  # which is the same as just running _solve multiple times
+  answers = []
+  for _ in range(n_paths):
+    answer = _solve( question )
+    print(answer)
+    answers.append( answer )
+
+  # Now, use another model call to pick the best answer
+  systemPrompt = ConvoMessage(
+    role="system",
+    content=f"""
+    You are a helpful assistant that picks the best
+    answer among multiple candidate answers to a question.
+    If one is objectively better, or substantially more
+    common, or the best properly formed answer, pick that one.
+
+    For context, this is the question:
+    {question}
+
+    And these are the candidate answers:
+    {answers}
+
+    Format your response as a simple, final answer string,
+    without any extra commentary.
+    """
+  ) 
+
+  # User prompt will just ask for the
+  # answer, again conscisely
+  userPrompt = ConvoMessage(
+    role="user",
+    content="Please provide the best final answer among the candidates, concisely."
+  )
+
+  # Run it
+  messages = [ systemPrompt, userPrompt ]
+  modelResp = rawCall( messages )
+  finalAnswer = modelResp.json()["choices"][0]["message"]["content"]
+  return finalAnswer.strip()
+
 if __name__ == "__main__":
+
   # Pull question from first
   # command line argument
   if len(sys.argv) > 1:
@@ -220,5 +271,6 @@ if __name__ == "__main__":
     print("Question:", question)
   else:
     raise ValueError("Please provide a question as a command line argument.")
-  answer = solve( question )
+  # answer = solve( question )
+  answer = solve( question, n_paths=5 )
   print("Final Answer:", answer)
