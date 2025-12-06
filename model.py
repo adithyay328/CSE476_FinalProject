@@ -12,10 +12,10 @@ API_KEY  = os.getenv("OPENAI_API_KEY", "cse476")
 API_BASE = os.getenv("API_BASE", "http://10.4.58.53:41701/v1")  
 MODEL    = os.getenv("MODEL_NAME", "bens_model")              
 
-def rawCall(messages : List[ConvoMessage], temperature: float = 0.0, timeout: int = 60):
-  url = f"{API_BASE}/chat/completions"
+def rawCall(messages : List[ConvoMessage], temperature: float = 0.0, timeout: int = 60, key=API_KEY, base=API_BASE, model=MODEL):
+  url = f"{base}/chat/completions"
   headers = {
-      "Authorization": f"Bearer {API_KEY}",
+      "Authorization": f"Bearer {key}",
       "Content-Type":  "application/json",
   }
 
@@ -24,10 +24,10 @@ def rawCall(messages : List[ConvoMessage], temperature: float = 0.0, timeout: in
   ]
 
   payload = {
-      "model": MODEL,
+      "model": model,
       "messages": messages,
       "temperature": temperature,
-      "max_tokens": 5000,
+      "max_tokens": 128,
   }
   resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
   return resp

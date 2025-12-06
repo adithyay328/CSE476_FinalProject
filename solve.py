@@ -150,9 +150,7 @@ def solve( question : str ):
   # Now, keep going until we have a final answer
   finalAnswer = ""
   while finalAnswer == "":
-    print("Making raw call")
     modelResp = rawCall( messages )
-    print("Raw call complete")
     text = modelResp.json()["choices"][0]["message"]["content"]
 
     # Check if final answer
@@ -189,7 +187,7 @@ def solve( question : str ):
 
       observationConvoMessage = ConvoMessage(
         role="tool",
-        content=observation
+        content=f"Observation: {observation}"
       )
 
       messages.append( observationConvoMessage )
@@ -199,7 +197,6 @@ def solve( question : str ):
     else:
       # Unknown message type, remind
       # the model of the format
-      print("Unknown message type from model, reminding of format.")
       reminderConvoMessage = ConvoMessage(
         role="assistant",
         content="""
