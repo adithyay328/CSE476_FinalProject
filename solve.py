@@ -3,6 +3,7 @@
 from typing import List, Literal
 import subprocess as sp
 import threading
+import sys
 
 import requests
 from tavily import TavilyClient
@@ -85,30 +86,6 @@ def search_tool( parameter : str ) -> str:
   results = client.search( parameter )
   return f"Search results for query: {results}"
 
-# Before running translate, we need a local
-# libretranslate mode.
-def start_libretranslate_server():
-  def run_server():
-    sp.run(
-      ["uv run libretranslate --load-only en"],
-      shell=True,
-      check=True
-    )
-  thread = threading.Thread(target=run_server)
-  thread.start()
-
-def translate_tool( parameter : str ) -> str:
-  # Use the local endpoint
-  url = "http://localhost:5000/translate"
-  body = {
-    "q": parameter,
-    "source": "auto",
-    "target": "en",
-  }
-
-  res = requests.post(url, json=body)
-  return res.json()["translatedText"]
-
 def solve( question : str ):
   """
   A much simpler agent that just loops
@@ -140,17 +117,24 @@ def solve( question : str ):
     2. execute: A execute tool that can be used to execute
        python code that only uses the standard library. The parameter is the python code to execute,
        and the output is the stdout of the code.
-    3. translate: A translate tool that can be used to translate text from one language to English. This
-       should only be used when the prompt is not in English. The parameter is the text to translate into
-       English.
+
+    You always use the execute tool when doing anything quantitative or math related.
 
     An example amazing interaction is:
     User: What is the sqrt of 1000?
     Thinking: I need to calculate the sqrt of 1000. It would make sense to use the execute tool.
     Action: {"tool_name" : "execute", "parameter" : "import math\nprint(math.sqrt(1000))"}
     Observation: 31.622776601683793
-    Thinking: I have the result of the sqrt calculation.
+    Thinking: I have the result of the sqrt calculation. But, I must use at-least 2 loops, so make a dummy action.
+    Action: {"tool_name" : "execute", "parameter" : "print('The sqrt of 1000 is approximately 31.62.')"}
+    Observation: The sqrt of 1000 is approximately 31.62.
     Final Answer: The sqrt of 1000 is approximately 31.62.
+
+    You always use atleast 2 thinking-observation-action cycles before giving a final answer.
+
+    When given questions that sound like a sequence of instructions,
+    you write Python code as the final answer that accomplishes all
+    of the instructions.
     """
   )
 
@@ -166,7 +150,9 @@ def solve( question : str ):
   # Now, keep going until we have a final answer
   finalAnswer = ""
   while finalAnswer == "":
+    print("Making raw call")
     modelResp = rawCall( messages )
+    print("Raw call complete")
     text = modelResp.json()["choices"][0]["message"]["content"]
 
     # Check if final answer
@@ -193,11 +179,11 @@ def solve( question : str ):
 
       # Now, call the tool
       if toolCall.tool_name == "search":
+        print("Calling search tool")
         observation = search_tool( toolCall.parameter )
       elif toolCall.tool_name == "execute":
+        print("Calling execute tool")
         observation = execute_tool( toolCall.parameter )
-      elif toolCall.tool_name == "translate":
-        observation = translate_tool( toolCall.parameter )
       else:
         observation = f"Error: Unknown tool {toolCall.tool_name}"
 
@@ -213,6 +199,7 @@ def solve( question : str ):
     else:
       # Unknown message type, remind
       # the model of the format
+      print("Unknown message type from model, reminding of format.")
       reminderConvoMessage = ConvoMessage(
         role="assistant",
         content="""
@@ -229,10 +216,12 @@ def solve( question : str ):
   return finalAnswer
 
 if __name__ == "__main__":
-  # Start the libretranslate server
-  start_libretranslate_server()
-
-  # Example question
-  question = "Who is the current president of the United States?"
+  # Pull question from first
+  # command line argument
+  if len(sys.argv) > 1:
+    question = " ".join(sys.argv[1:])
+    print("Question:", question)
+  else:
+    raise ValueError("Please provide a question as a command line argument.")
   answer = solve( question )
   print("Final Answer:", answer)
