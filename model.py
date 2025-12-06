@@ -27,7 +27,7 @@ def rawCall(messages : List[ConvoMessage], temperature: float = 0.0, timeout: in
       "model": model,
       "messages": messages,
       "temperature": temperature,
-      "max_tokens": 128,
+      "max_tokens": 1024,
   }
   resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
   return resp
