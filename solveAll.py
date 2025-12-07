@@ -36,7 +36,7 @@ def worker():
 
     while not solved:
       try:
-        answer = solve.solve(question)
+        answer = solve.solve(question, n_paths=5)
         solved = True
       except:
         time.sleep(backoffSeconds)
